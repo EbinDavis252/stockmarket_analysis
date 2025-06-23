@@ -7,13 +7,13 @@ from ta.trend import MACD
 from ta.momentum import RSIIndicator
 from ta.volatility import BollingerBands
 
-# Set page configuration
-st.set_page_config(page_title="Adani Ports Stock Analysis", layout="wide")
+# Set Streamlit page config
+st.set_page_config(page_title="Adani Ports Technical Analysis", layout="wide")
 
 st.title("📈 ADANIPORTS Stock Technical Analysis")
 st.markdown("This app performs technical analysis of **Adani Ports (ADANIPORTS.NS)** using Moving Averages, RSI, MACD, and Bollinger Bands.")
 
-# Fetch Data
+# Load data
 @st.cache_data
 def load_data():
     df = yf.download('ADANIPORTS.NS', start='2020-01-01', end='2025-01-01')
@@ -22,34 +22,37 @@ def load_data():
 
 df = load_data()
 
-# Calculate indicators
-df['MA20'] = df['Close'].rolling(window=20).mean()
-df['MA50'] = df['Close'].rolling(window=50).mean()
+# Ensure 'Close' is a 1D float Series
+close_series = df['Close'].astype(float).squeeze()
 
-rsi = RSIIndicator(close=df['Close'], window=14)
+# Calculate technical indicators
+df['MA20'] = close_series.rolling(window=20).mean()
+df['MA50'] = close_series.rolling(window=50).mean()
+
+rsi = RSIIndicator(close=close_series, window=14)
 df['RSI'] = rsi.rsi()
 
-macd = MACD(close=df['Close'])
+macd = MACD(close=close_series)
 df['MACD'] = macd.macd()
 df['MACD_Signal'] = macd.macd_signal()
 
-bb = BollingerBands(close=df['Close'], window=20, window_dev=2)
+bb = BollingerBands(close=close_series, window=20, window_dev=2)
 df['BB_High'] = bb.bollinger_hband()
 df['BB_Low'] = bb.bollinger_lband()
 
-df['Daily Return'] = df['Close'].pct_change()
+df['Daily Return'] = close_series.pct_change()
 df['Cumulative Return'] = (1 + df['Daily Return']).cumprod()
 
-# Sidebar
-st.sidebar.header("📌 Options")
-show_ma = st.sidebar.checkbox("Show Moving Averages & Bollinger Bands", True)
-show_rsi = st.sidebar.checkbox("Show RSI", True)
-show_macd = st.sidebar.checkbox("Show MACD", True)
-show_returns = st.sidebar.checkbox("Show Returns", True)
+# Sidebar options
+st.sidebar.header("📌 Visualization Options")
+show_ma = st.sidebar.checkbox("Moving Averages & Bollinger Bands", True)
+show_rsi = st.sidebar.checkbox("Relative Strength Index (RSI)", True)
+show_macd = st.sidebar.checkbox("MACD", True)
+show_returns = st.sidebar.checkbox("Daily & Cumulative Returns", True)
 
-# Charts
+# Moving Averages and Bollinger Bands Plot
 if show_ma:
-    st.subheader("Close Price with Moving Averages & Bollinger Bands")
+    st.subheader("Close Price with MA & Bollinger Bands")
     fig, ax = plt.subplots(figsize=(14, 5))
     ax.plot(df['Close'], label='Close', color='blue')
     ax.plot(df['MA20'], label='MA20', color='orange')
@@ -57,21 +60,23 @@ if show_ma:
     ax.plot(df['BB_High'], label='BB High', linestyle='--', alpha=0.4)
     ax.plot(df['BB_Low'], label='BB Low', linestyle='--', alpha=0.4)
     ax.fill_between(df.index, df['BB_Low'], df['BB_High'], color='gray', alpha=0.1)
-    ax.set_title('ADANIPORTS - Price with MA & Bollinger Bands')
+    ax.set_title('Price with Moving Averages & Bollinger Bands')
     ax.legend()
     ax.grid(True)
     st.pyplot(fig)
 
+# RSI Plot
 if show_rsi:
     st.subheader("Relative Strength Index (RSI)")
     fig, ax = plt.subplots(figsize=(14, 3))
     ax.plot(df['RSI'], label='RSI', color='purple')
     ax.axhline(70, color='red', linestyle='--')
     ax.axhline(30, color='green', linestyle='--')
-    ax.set_title('RSI - Overbought/ Oversold Zones')
+    ax.set_title('RSI - Overbought & Oversold Zones')
     ax.grid(True)
     st.pyplot(fig)
 
+# MACD Plot
 if show_macd:
     st.subheader("MACD & Signal Line")
     fig, ax = plt.subplots(figsize=(14, 3))
@@ -79,9 +84,10 @@ if show_macd:
     ax.plot(df['MACD_Signal'], label='Signal Line', color='red')
     ax.legend()
     ax.grid(True)
-    ax.set_title('MACD vs Signal')
+    ax.set_title('MACD vs Signal Line')
     st.pyplot(fig)
 
+# Returns Plot
 if show_returns:
     st.subheader("Cumulative Return of ADANIPORTS")
     fig, ax = plt.subplots(figsize=(14, 3))
@@ -90,5 +96,6 @@ if show_returns:
     ax.grid(True)
     st.pyplot(fig)
 
-    st.write("📊 **Average Daily Return:**", round(df['Daily Return'].mean(), 4))
-    st.write("📊 **Volatility (Standard Deviation):**", round(df['Daily Return'].std(), 4))
+    st.markdown("#### 📊 Return Metrics")
+    st.write("**Average Daily Return:**", round(df['Daily Return'].mean(), 4))
+    st.write("**Volatility (Standard Deviation):**", round(df['Daily Return'].std(), 4))
